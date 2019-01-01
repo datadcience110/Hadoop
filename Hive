@@ -1,0 +1,56 @@
+
+* Problem Statement:
+  Obtain combined accesslogs from client website on daily, weekly and monthly bases and perform Reporting in Excel File.
+
+* Tools/Platform : Hive / HDP 2.5
+
+* Create Database
+CREATE DATABASE mayur;
+
+* Change Database
+USE DATABASE mayur;
+
+* Create Table Weblogs with Regular Expression Serialization Deserialization Properties according to requirements for Combined Access Logs.
+
+DROP TABLE IF EXISTS weblogs;
+ 
+CREATE TABLE weblogs (
+  host STRING,
+  identity STRING,
+  userid STRING,
+  time STRING,
+  request STRING,
+  status STRING,
+  size STRING,
+  referer STRING,
+  agent STRING)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.RegexSerDe'
+WITH SERDEPROPERTIES (
+  "input.regex" = "([^ ]*) ([^ ]*) ([^ ]*) (-|\\[[^\\]]*\\]) ([^ \"]*|\"[^\"]*\") (-|[0-9]*) (-|[0-9]*)(?: ([^ \"]*|\"[^\"]*\") ([^ \"]*|\"[^\"]*\"))?",
+  "output.format.string" = "%1$s %2$s %3$s %4$s %5$s %6$s %7$s %8$s %9$s"
+)
+STORED AS TEXTFILE;
+ 
+LOAD DATA INPATH "hdfs://sandbox.hortonworks.com:8020/mayur/weblogs.log" INTO TABLE weblogs;
+
+1. Find the count of people visiting.
+SELECT count(DISTINCT host) FROM weblogs;
+
+2. Find peak hours of operations.
+SELECT SUBSTR(time,14,2), COUNT(request) as CNT FROM weblogs GROUP BY SUBSTR(time,14,2) ORDER BY CNT DESC LIMIT 5;
+
+3. Find the trending links (Top 5).
+SELECT request, COUNT(request) AS CNT FROM weblogs GROUP BY request ORDER BY CNT DESC LIMIT 5;
+
+4. Count of people who made paid clicks. Links that have (“gclid”) in the link.
+SELECT SUBSTR(time,2,11),COUNT(request) FROM weblogs  WHERE request LIKE '%gclid%' GROUP BY SUBSTR(time,2,11);
+
+5. Count of people who made clicks and never returned.
+SELECT count(host) FROM weblogs GROUP BY host HAVING count(host) == 1;
+
+6. Count the number returning customers and non-returning customers.
+SELECT count(host) FROM weblogs GROUP BY host HAVING count(host) == 1;
+SELECT count(host) FROM weblogs GROUP BY host HAVING count(host) >= 1;
+
+7. Count of frequency of visits per ip.
+SELECT host, COUNT(host) FROM weblogs GROUP BY host;
